@@ -1,0 +1,14 @@
+Debug/
+Release/
+*.elf
+*.bin
+*.hex
+*.map
+*.o
+*.d
+*.su
+.settings/
+*.launch
+.mxproject
+Thumbs.db
+.DS_Store
