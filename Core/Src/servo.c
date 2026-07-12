@@ -78,6 +78,42 @@ void servo_write_byte(uint8_t id, uint8_t start_addr, uint8_t num_bytes, ...) {
 	HAL_UART_Transmit(&huart1, servo_cmd, num_bytes + 7, HAL_MAX_DELAY);
 }
 
+void servo_sync_write_byte(uint8_t start_addr, uint8_t num_bytes_per_servo, ...) {
+	uint8_t data_buffer[NUM_SERVOS*32];
+	if(num_bytes_per_servo > 32) return;
+
+	va_list args;
+	va_start(args, num_bytes_per_servo);
+
+	for (uint8_t i = 0; i < num_bytes_per_servo * NUM_SERVOS; i++) {
+		data_buffer[i] = (uint8_t)va_arg(args, int);
+	}
+
+	va_end(args);
+
+	uint8_t servo_cmd[(6*32)+6] = {0XFF, 0XFF, 0xFE, ((num_bytes_per_servo + 1) * NUM_SERVOS) + 4, 0X83, start_addr, num_bytes_per_servo};
+
+	uint8_t checksum = servo_cmd[2] + servo_cmd[3] + servo_cmd[4] + servo_cmd[5] + servo_cmd[6];
+
+	uint16_t counter = 7;
+
+	for(int id = 1; id <= NUM_SERVOS; id++){
+		servo_cmd[counter] = id;
+		checksum += servo_cmd[counter];
+		counter++;
+		for(uint8_t i = 0; i < num_bytes_per_servo; i++){
+				servo_cmd[counter] = data_buffer[i + ((id -1) * num_bytes_per_servo)];
+				checksum += servo_cmd[counter];
+				counter++;
+		}
+	}
+
+	servo_cmd[counter] = ~checksum;
+	counter++;
+
+	HAL_UART_Transmit(SERVO_UART_HANDLER, servo_cmd, counter, HAL_MAX_DELAY);
+}
+
 void servo_read_all(void){
 	//set motor buffer ready flag to zero
 	memset((void*)motor_buffer_ready, 0, sizeof(motor_buffer_ready));
