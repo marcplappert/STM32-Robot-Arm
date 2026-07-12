@@ -21,6 +21,7 @@ void terminal_print_servo_data(void) {
 	uint16_t Location[7];
 	uint16_t Speed[7];
 	float Load[7];
+
 	uint8_t Temp[7];
 	uint8_t Status[7];
 	uint8_t Motion[7];
