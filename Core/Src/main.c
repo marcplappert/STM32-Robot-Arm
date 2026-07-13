@@ -52,9 +52,6 @@ DMA_HandleTypeDef hdma_usart1_rx;
 /* USER CODE BEGIN PV */
 //DMA
 uint8_t rx_buffer[50];
-uint8_t motor_buffer[7][30];
-uint8_t motor_buffer_size[7];
-uint8_t motor_buffer_ready[7];
 //timer
 volatile uint8_t timer_20ms_trigger = 0;
 // robot arm instance
@@ -143,10 +140,10 @@ int main(void)
 		timer_20ms_trigger = 0;
 
 		//liest alle Daten der Servos aus
-		servo_read_all();
+		servo_read_all(&soarm101);
 
 		//schickt alle rellevanten daten alle 25 Zyklen (500ms) an das pc terminal
-		terminal_print_servo_data();
+		terminal_print_servo_data(&soarm101);
 
 		/* USER CODE END WHILE */
 
@@ -379,14 +376,13 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 {
-	if(huart->Instance == USART1)
+	if(huart->Instance == soarm101.huart->Instance)
 	{
 		uint8_t servo_id = rx_buffer[2];
-		if(servo_id >= 1 && servo_id <= 6)
+		if(servo_id >= 1 && servo_id <= soarm101.servo_count)
 		{
-			memcpy(motor_buffer[servo_id], rx_buffer, Size);
-			motor_buffer_size[servo_id] = Size;
-			motor_buffer_ready[servo_id] = 1;
+			memcpy(soarm101.servo_buffer[servo_id], rx_buffer, Size);
+			soarm101.servo_buffer_ready[servo_id] = 1;
 		}
 	}
 
@@ -401,7 +397,7 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
-	servo_write_byte(0xFE, 0x28, 1, 0);
+	servo_write_byte(&soarm101, 0xFE, 0x28, 1, 0);
   /* User can add his own implementation to report the HAL error return state */
   __disable_irq();
   while (1)

@@ -29,10 +29,12 @@ extern uint8_t motor_buffer[7][30];
 typedef struct{
 	UART_HandleTypeDef *huart;
 	uint8_t servo_count;
+	uint8_t servo_buffer[7][30];
+	uint8_t servo_buffer_ready[7];
 } ServoArm_t;
 
-void terminal_print_servo_data(void);
-void servo_write_byte(uint8_t id, uint8_t start_addr, uint8_t num_bytes, ...);
+void terminal_print_servo_data(ServoArm_t *arm);
+void servo_write_byte(ServoArm_t *arm, uint8_t id, uint8_t start_addr, uint8_t num_bytes, ...);
 
 /**
  * @brief writes multiple bytes to all the servos of an robot arm at the same time.
@@ -42,11 +44,11 @@ void servo_write_byte(uint8_t id, uint8_t start_addr, uint8_t num_bytes, ...);
  * @param[in] data_buffer			an array containing all the data to send.
  */
 void servo_sync_write(ServoArm_t *arm, uint8_t start_addr, uint8_t num_bytes_per_servo, const uint8_t *data_buffer);
-void servo_read_all(void);
-void servo_read_id(uint8_t id);
-void servo_set_angle(uint8_t id, float angle);
+void servo_read_all(ServoArm_t *arm);
+void servo_read_id(ServoArm_t *arm, uint8_t id);
+void servo_set_angle(ServoArm_t *arm, uint8_t id, float angle);
 void servo_set_all_angle(ServoArm_t *arm, float *angle);
-void servo_zero_point_calibration(void);
-void servo_min_max_calibration(uint8_t motor_buffer[][30], uint8_t *motor_buffer_ready);
-void servo_max_torque_initialization(void);
+void servo_zero_point_calibration(ServoArm_t *arm);
+void servo_min_max_calibration(ServoArm_t *arm);
+void servo_max_torque_initialization(ServoArm_t *arm);
 #endif /* INC_SERVO_H_ */
