@@ -10,10 +10,9 @@
 #include <stdarg.h>
 #include <string.h>
 
-#define REG_TORQUE_ENABLE 0x28
 #define TERMINAL_PRINT_CYCLE_COUNT 25
 
-uint8_t terminal_print_count = 0;
+static uint8_t terminal_print_count = 0;
 
 void terminal_print_servo_data(void) {
 	//terminal print pv
@@ -32,7 +31,7 @@ void terminal_print_servo_data(void) {
 		for (int id = 1; id < 7; id++) {
 			Location[id] = (motor_buffer[id][6] << 8) | motor_buffer[id][5];
 			Speed[id] = (motor_buffer[id][8] << 8) | motor_buffer[id][7];
-			uint16_t raw_load = (motor_buffer[id][10] << 8)
+			int16_t raw_load = (motor_buffer[id][10] << 8)
 					| motor_buffer[id][9];
 			Load[id] = (float) raw_load / 10;
 			Temp[id] = motor_buffer[id][12];
@@ -40,7 +39,7 @@ void terminal_print_servo_data(void) {
 			Motion[id] = motor_buffer[id][15];
 			uint8_t raw_voltage = motor_buffer[id][11];
 			Voltage[id] = (float) raw_voltage / 10;
-			uint8_t raw_current = motor_buffer[id][18];
+			int8_t raw_current = motor_buffer[id][18];
 			Current[id] = (float) raw_current * 6.5 / 1000;
 			int text_len = snprintf(msg, sizeof(msg),
 							"ID: %1d Location: %4d stp Speed: %4d stp/s Load: %5.1f%% Temp: %2d°C Status: %1d Motion %1d Voltage: %4.1fV Current: %5.3fA \r\n",
@@ -78,26 +77,21 @@ void servo_write_byte(uint8_t id, uint8_t start_addr, uint8_t num_bytes, ...) {
 	HAL_UART_Transmit(&huart1, servo_cmd, num_bytes + 7, HAL_MAX_DELAY);
 }
 
-void servo_sync_write_byte(uint8_t start_addr, uint8_t num_bytes_per_servo, ...) {
-	uint8_t data_buffer[NUM_SERVOS*32];
-	if(num_bytes_per_servo > 32) return;
+void servo_sync_write(ServoArm_t *arm, uint8_t start_addr, uint8_t num_bytes_per_servo, const uint8_t *data_buffer) {
+	//sanity check
+	if(arm == NULL || arm->servo_count == 0 || arm->huart == NULL || num_bytes_per_servo == 0 || data_buffer == NULL) return;
+	if((arm->servo_count * (num_bytes_per_servo + 1)) + 8 > 256) return;
 
-	va_list args;
-	va_start(args, num_bytes_per_servo);
-
-	for (uint8_t i = 0; i < num_bytes_per_servo * NUM_SERVOS; i++) {
-		data_buffer[i] = (uint8_t)va_arg(args, int);
-	}
-
-	va_end(args);
-
-	uint8_t servo_cmd[(6*32)+6] = {0XFF, 0XFF, 0xFE, ((num_bytes_per_servo + 1) * NUM_SERVOS) + 4, 0X83, start_addr, num_bytes_per_servo};
+	//packet header initialization
+	uint8_t servo_cmd[256] = {0XFF, 0XFF, SERVO_ID_BROADCAST_TO_ALL,
+			((num_bytes_per_servo + 1) * arm->servo_count) + 4, SERVO_CMD_SYNC_WRITE, start_addr, num_bytes_per_servo};
 
 	uint8_t checksum = servo_cmd[2] + servo_cmd[3] + servo_cmd[4] + servo_cmd[5] + servo_cmd[6];
 
 	uint16_t counter = 7;
 
-	for(int id = 1; id <= NUM_SERVOS; id++){
+	//payload loop
+	for(int id = 1; id <= arm->servo_count; id++){
 		servo_cmd[counter] = id;
 		checksum += servo_cmd[counter];
 		counter++;
@@ -108,10 +102,12 @@ void servo_sync_write_byte(uint8_t start_addr, uint8_t num_bytes_per_servo, ...)
 		}
 	}
 
+	//final checksum calculation
 	servo_cmd[counter] = ~checksum;
 	counter++;
 
-	HAL_UART_Transmit(SERVO_UART_HANDLER, servo_cmd, counter, HAL_MAX_DELAY);
+	//data transfer
+	HAL_UART_Transmit(arm->huart, servo_cmd, counter, HAL_MAX_DELAY);
 }
 
 void servo_read_all(void){
@@ -182,6 +178,24 @@ void servo_set_angle(uint8_t id, float angle){
 	uint16_t speed = (32766 / ((7 - id) * (7 - id)));
 
 	servo_write_byte(id, 0X2A, 6, steps & 0xFF, (steps >> 8) & 0xFF, 0X00, 0X00, speed & 0xFF, (speed >> 8) & 0xFF);
+}
+
+void servo_set_all_angle(ServoArm_t *arm, float *angle){
+	if(arm->servo_count > 6) return;
+
+	uint8_t msg[6][6];
+	for(int id = 1; id <= arm->servo_count; id++){
+		uint16_t steps = (((angle[id - 1] + 180) * 4095) / 360);
+		uint16_t speed= (32766 / ((7 - id) * (7 - id)));
+		msg[id - 1][0] = steps & 0xFF;
+		msg[id - 1][1] = (steps >> 8) & 0xFF;
+		msg[id - 1][2] = 0;
+		msg[id - 1][3] = 0;
+		msg[id - 1][4] = speed & 0xFF;
+		msg[id - 1][5] = (speed >> 8) & 0xFF;
+	}
+
+	servo_sync_write(arm, SERVO_REG_TARGET_LOCATION, 6, (uint8_t *)msg);
 }
 
 void servo_zero_point_calibration(void){

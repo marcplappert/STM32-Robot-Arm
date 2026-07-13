@@ -57,7 +57,11 @@ uint8_t motor_buffer_size[7];
 uint8_t motor_buffer_ready[7];
 //timer
 volatile uint8_t timer_20ms_trigger = 0;
-
+// robot arm instance
+ServoArm_t soarm101 = {
+		.huart = &huart1,
+		.servo_count = 6
+};
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -120,6 +124,13 @@ int main(void)
 //servo_zero_point_calibration();
 //servo_min_max_calibration(motor_buffer, motor_buffer_ready);
 //servo_max_torque_initialization();
+
+//  float angle_2[6] = {35, 20, 20, 20, 20, 20};
+//  servo_set_all_angle(&soarm101, angle_2);
+//  HAL_Delay(1000);
+//  float angle[6] = {0, 0, 0, 0, 0, 0};
+//  servo_set_all_angle(&soarm101, angle);
+//  HAL_Delay(1000);
 
   /* USER CODE END 2 */
 
