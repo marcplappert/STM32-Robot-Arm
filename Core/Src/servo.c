@@ -7,6 +7,7 @@
 
 #include"servo.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
 
@@ -184,21 +185,25 @@ void servo_set_angle(ServoArm_t *arm, uint8_t id, float angle){
 }
 
 void servo_set_all_angle(ServoArm_t *arm, float *angle){
-	if(arm->servo_count > 6) return;
+	if(arm->servo_count > SERVO_MAX_COUNT) return;
 
-	uint8_t msg[6][6];
-	for(int id = 1; id <= arm->servo_count; id++){
+	uint8_t msg[SERVO_MAX_COUNT][2];
+	for(int id = arm->servo_first_id; id <= arm->servo_count; id++){
 		uint16_t steps = (((angle[id - 1] + 180) * 4095) / 360);
-		uint16_t speed= (32766 / ((7 - id) * (7 - id)));
-		msg[id - 1][0] = steps & 0xFF;
-		msg[id - 1][1] = (steps >> 8) & 0xFF;
-		msg[id - 1][2] = 0;
-		msg[id - 1][3] = 0;
-		msg[id - 1][4] = speed & 0xFF;
-		msg[id - 1][5] = (speed >> 8) & 0xFF;
+		uint16_t current_location = (arm->servo_buffer[id][6] << 8) | arm->servo_buffer[id][5];
+		int diff = steps - current_location;
+		if(abs(diff) > SERVO_ANGLE_TOLERANCE){
+			if(abs(diff) > 20){
+				current_location += (diff * 0.25f);
+			}else{
+				current_location += diff;
+			}
+		}
+		msg[id - 1][0] = current_location & 0xFF;
+		msg[id - 1][1] = (current_location >> 8) & 0xFF;
 	}
 
-	servo_sync_write(arm, SERVO_REG_TARGET_LOCATION, 6, (uint8_t *)msg);
+	servo_sync_write(arm, SERVO_REG_TARGET_LOCATION, 2, (uint8_t *)msg);
 }
 
 void servo_zero_point_calibration(ServoArm_t *arm){

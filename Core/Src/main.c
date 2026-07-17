@@ -121,13 +121,6 @@ int main(void)
 //servo_min_max_calibration(motor_buffer, motor_buffer_ready);
 //servo_max_torque_initialization();
 
-  float angle_2[6] = {35, 20, 20, 20, 20, 20};
-  servo_set_all_angle(&soarm101, angle_2);
-  HAL_Delay(1000);
-  float angle[6] = {0, 0, 0, 0, 0, 0};
-  servo_set_all_angle(&soarm101, angle);
-  HAL_Delay(1000);
-
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -144,6 +137,10 @@ int main(void)
 		//schickt alle rellevanten daten alle 25 Zyklen (500ms) an das pc terminal
 		terminal_print_servo_data(&soarm101);
 
+		//move the arm
+		float angle_2[6] = {35, 20, 20, 20, 20, 20};
+		float angle[6] = {0, 0, 0, 0, 0, 0};
+		servo_set_all_angle(&soarm101, angle);
 
 		/* USER CODE END WHILE */
 

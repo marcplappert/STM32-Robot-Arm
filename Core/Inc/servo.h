@@ -24,6 +24,7 @@ extern uint8_t motor_buffer[7][30];
 #define SERVO_REG_CURRENT_LOCATION 0x38
 #define SERVO_REG_TARGET_LOCATION 0x2A
 #define SERVO_MAX_WAIT_TIME 15
+#define SERVO_ANGLE_TOLERANCE 2 //max amount of steps, that don't lead to an correction in position
 #define SERVO_MAX_COUNT 10 //Max number of servos in one arm
 #define SERVO_MAX_BYTES_TO_READ 50
 
