@@ -144,6 +144,7 @@ int main(void)
 		//schickt alle rellevanten daten alle 25 Zyklen (500ms) an das pc terminal
 		terminal_print_servo_data(&soarm101);
 
+
 		/* USER CODE END WHILE */
 
 		/* USER CODE BEGIN 3 */
