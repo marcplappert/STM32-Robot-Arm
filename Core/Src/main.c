@@ -50,14 +50,13 @@ UART_HandleTypeDef huart2;
 DMA_HandleTypeDef hdma_usart1_rx;
 
 /* USER CODE BEGIN PV */
-//DMA
-uint8_t rx_buffer[50];
 //timer
 volatile uint8_t timer_20ms_trigger = 0;
 // robot arm instance
 ServoArm_t soarm101 = {
 		.huart = &huart1,
-		.servo_count = 6
+		.servo_count = 6,
+		.servo_first_id = 1
 };
 /* USER CODE END PV */
 
@@ -114,7 +113,7 @@ int main(void)
   HAL_Delay(2500);
   HAL_UART_Transmit(&huart2, (uint8_t*)"start\r\n", 7, HAL_MAX_DELAY);
   //start the DMA with interrupts
-  HAL_UARTEx_ReceiveToIdle_DMA(&huart1, rx_buffer, sizeof(rx_buffer));
+  HAL_UARTEx_ReceiveToIdle_DMA(soarm101.huart, soarm101.rx_buffer, sizeof(soarm101.rx_buffer));
   //start the tim4 with interrupts
   HAL_TIM_Base_Start_IT(&htim4);
 
@@ -122,12 +121,12 @@ int main(void)
 //servo_min_max_calibration(motor_buffer, motor_buffer_ready);
 //servo_max_torque_initialization();
 
-//  float angle_2[6] = {35, 20, 20, 20, 20, 20};
-//  servo_set_all_angle(&soarm101, angle_2);
-//  HAL_Delay(1000);
-//  float angle[6] = {0, 0, 0, 0, 0, 0};
-//  servo_set_all_angle(&soarm101, angle);
-//  HAL_Delay(1000);
+  float angle_2[6] = {35, 20, 20, 20, 20, 20};
+  servo_set_all_angle(&soarm101, angle_2);
+  HAL_Delay(1000);
+  float angle[6] = {0, 0, 0, 0, 0, 0};
+  servo_set_all_angle(&soarm101, angle);
+  HAL_Delay(1000);
 
   /* USER CODE END 2 */
 
@@ -140,7 +139,7 @@ int main(void)
 		timer_20ms_trigger = 0;
 
 		//liest alle Daten der Servos aus
-		servo_read_all(&soarm101);
+		servo_sync_read(&soarm101, SERVO_REG_CURRENT_LOCATION, 14);
 
 		//schickt alle rellevanten daten alle 25 Zyklen (500ms) an das pc terminal
 		terminal_print_servo_data(&soarm101);
@@ -378,15 +377,15 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 {
 	if(huart->Instance == soarm101.huart->Instance)
 	{
-		uint8_t servo_id = rx_buffer[2];
+		uint8_t servo_id = soarm101.rx_buffer[2];
 		if(servo_id >= 1 && servo_id <= soarm101.servo_count)
 		{
-			memcpy(soarm101.servo_buffer[servo_id], rx_buffer, Size);
+			memcpy(soarm101.servo_buffer[servo_id], soarm101.rx_buffer, Size);
 			soarm101.servo_buffer_ready[servo_id] = 1;
 		}
 	}
 
-	HAL_UARTEx_ReceiveToIdle_DMA(&huart1, rx_buffer, sizeof(rx_buffer));
+	HAL_UARTEx_ReceiveToIdle_DMA(soarm101.huart, soarm101.rx_buffer, sizeof(soarm101.rx_buffer));
 }
 /* USER CODE END 4 */
 

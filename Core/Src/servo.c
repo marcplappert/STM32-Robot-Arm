@@ -81,7 +81,7 @@ void servo_sync_write(ServoArm_t *arm, uint8_t start_addr, uint8_t num_bytes_per
 	uint16_t counter = 7;
 
 	//payload loop
-	for(int id = 1; id <= arm->servo_count; id++){
+	for(int id = arm->servo_first_id; id <= arm->servo_count; id++){
 		servo_cmd[counter] = id;
 		checksum += servo_cmd[counter];
 		counter++;
@@ -100,27 +100,40 @@ void servo_sync_write(ServoArm_t *arm, uint8_t start_addr, uint8_t num_bytes_per
 	HAL_UART_Transmit(arm->huart, servo_cmd, counter, HAL_MAX_DELAY);
 }
 
-void servo_read_all(ServoArm_t *arm){
+void servo_sync_read(ServoArm_t *arm, uint8_t start_addr, uint8_t num_bytes_per_servo){
+	//sanity check
+	if(arm == NULL || arm->servo_count == 0 || arm->servo_count >= SERVO_MAX_COUNT || arm->huart == NULL || num_bytes_per_servo == 0) return;
+	if(num_bytes_per_servo > SERVO_MAX_BYTES_TO_READ) return;
+
 	//set motor buffer ready flag to zero
 	memset((void*)arm->servo_buffer_ready, 0, sizeof(arm->servo_buffer_ready));
 
-	//send command to read the data
-	uint8_t servo_cmd[] = {0XFF, 0XFF, 0XFE, 0X0A, 0X82, 0X38, 0X0E, 0X01, 0X02, 0X03, 0X04, 0X05, 0X06, 0X00};
+	//packet header initialization
+	uint8_t servo_cmd[SERVO_MAX_COUNT + 8] = {0XFF, 0XFF, SERVO_ID_BROADCAST_TO_ALL, arm->servo_count + 4, SERVO_CMD_SYNC_READ, start_addr, num_bytes_per_servo};
 
-	uint8_t checksum = 0;
-	for(int i = 2; i < (sizeof(servo_cmd) - 1); i++){
-		checksum += servo_cmd[i];
+	uint8_t checksum = servo_cmd[2] + servo_cmd[3] + servo_cmd[4] + servo_cmd[5] + servo_cmd[6];
+
+	uint16_t counter = 7;
+
+	//payload loop
+	for(int id = arm->servo_first_id; id <= arm->servo_count; id++){
+		servo_cmd[counter] = id;
+		checksum += servo_cmd[counter];
+		counter++;
 	}
-	servo_cmd[sizeof(servo_cmd) - 1] = ~checksum;
 
-	HAL_UART_Transmit(&huart1, servo_cmd, sizeof(servo_cmd), HAL_MAX_DELAY);
+	//final checksum calculation
+	servo_cmd[counter] = ~checksum;
+	counter++;
+
+	HAL_UART_Transmit(arm->huart, servo_cmd, counter, HAL_MAX_DELAY);
 
 	//wait till all motors have answered
 	uint32_t start_time = HAL_GetTick();
 	while(1){
 		uint8_t all_ready = 1;
 
-		for(int id = 1; id <= arm->servo_count; id++){
+		for(int id = arm->servo_first_id; id <= arm->servo_count; id++){
 			if(arm->servo_buffer_ready[id] == 0){
 				all_ready = 0;
 				break;
@@ -237,7 +250,7 @@ void servo_min_max_calibration(ServoArm_t *arm){
 		//Werte sammeln solange der Knopf nicht gedrückt ist
 		while(HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_13) == GPIO_PIN_SET){
 			servo_read_id(arm, id);
-			Location = (motor_buffer[id][6] << 8) | motor_buffer[id][5];
+			Location = (arm->servo_buffer[id][6] << 8) | arm->servo_buffer[id][5];
 			if (Location < min_angle) {
 				min_angle = Location;
 			}
